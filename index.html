@@ -1,54 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Hadamat Taxi</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-        }
-        #map {
-            height: 100%;
-            width: 100%;
-        }
-        #info {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 16px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.3);
-        }
-        #send {
-            width: 100%;
-            padding: 12px;
-            font-size: 18px;
-            margin-top: 10px;
-            background: #2b8eff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-        }
-    </style>
-
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-</head>
-<body>
-
-<div id="map"></div>
-
-<div id="info">
-    <div id="start">🚕 Точка A: Не выбрана</div>
-    <div id="end">📍 Точка B: Не выбрана</div>
-    <button id="send" disabled>Отправить 🚀</button>
-</div>
-
 <script>
     let map;
     let startMarker = null;
@@ -57,6 +6,11 @@
     let endPos = null;
 
     function initMap() {
+
+        // Telegram WebApp init
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+
         map = new google.maps.Map(document.getElementById("map"), {
             zoom: 12,
             center: { lat: 15.3694, lng: 44.1910 },
@@ -72,7 +26,8 @@
                 startPos = e.latLng;
                 document.getElementById("start").innerText =
                     "🚕 Точка A: " + e.latLng.lat().toFixed(5) + ", " + e.latLng.lng().toFixed(5);
-            } else if (!endMarker) {
+            } 
+            else if (!endMarker) {
                 endMarker = new google.maps.Marker({
                     position: e.latLng,
                     map: map,
@@ -87,15 +42,11 @@
         });
 
         document.getElementById("send").onclick = () => {
+            if (!startPos || !endPos) return;
+
             const data = {
-                start: {
-                    lat: startPos.lat(),
-                    lng: startPos.lng()
-                },
-                end: {
-                    lat: endPos.lat(),
-                    lng: endPos.lng()
-                }
+                start: { lat: startPos.lat(), lng: startPos.lng() },
+                end:   { lat: endPos.lat(), lng: endPos.lng() }
             };
 
             Telegram.WebApp.sendData(JSON.stringify(data));
@@ -104,9 +55,4 @@
     }
 </script>
 
-<script async
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBO5RQpbrvnBEfchhCGqKTpzvqOjJyf0RI&callback=initMap">
-</script>
 
-</body>
-</html>
