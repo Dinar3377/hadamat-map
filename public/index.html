@@ -1,120 +1,139 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Hadamat Taxi Map</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-    }
-    #map {
-      height: 100%;
-      width: 100%;
-    }
-    #locate-btn {
-      position: absolute;
-      top: 15px;
-      left: 15px;
-      z-index: 9999;
-      background-color: white;
-      border: 2px solid #4285f4;
-      color: #4285f4;
-      border-radius: 6px;
-      padding: 10px 15px;
-      font-weight: bold;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    }
-  </style>
+    <meta charset="utf-8">
+    <title>Hadamat Taxi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        #info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 16px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+        }
+        #send {
+            width: 100%;
+            padding: 12px;
+            font-size: 18px;
+            margin-top: 10px;
+            background: #2b8eff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+        }
+    </style>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <div id="map"></div>
-  <button id="locate-btn">📍 Моё местоположение</button>
 
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBO5RQpbrvnBEfchhCGqKTpzvqOjJyf0RI"></script>
+<div id="map"></div>
 
-  <script>
-    let map, markerStart, markerEnd;
+<!-- кнопка определения геопозиции -->
+<button id="locate-btn">📍 Моё местоположение</button>
+
+<div id="info">
+  <div id="start">🚕 Точка A: Не выбрана</div>
+  <div id="end">📍 Точка B: Не выбрана</div>
+  <button id="send" disabled>Отправить 🚀</button>
+</div>
+
+<script>
+  let map;
+  let startMarker = null;
+  let endMarker = null;
+  let startPos = null;
+  let endPos = null;
+
+  function initMap() {
+    Telegram.WebApp.ready();
+    Telegram.WebApp.expand();
+
+    map = new google.maps.Map(document.getElementById("map"), {
+      zoom: 13,
+      center: { lat: 15.3694, lng: 44.1910 }, // Йемен
+    });
+
+
+
+
+<div id="info">
+    <div id="start">🚕 Точка A: Не выбрана</div>
+    <div id="end">📍 Точка B: Не выбрана</div>
+    <button id="send" disabled>Отправить 🚀</button>
+</div>
+
+<script>
+    let map;
+    let startMarker = null;
+    let endMarker = null;
+    let startPos = null;
+    let endPos = null;
 
     function initMap() {
-      map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: 15.3694, lng: 44.1910 }, // Йемен
-        zoom: 13,
-      });
 
-      // слушаем клики на карте для выбора точек
-      map.addListener("click", (e) => {
-        if (!markerStart) {
-          markerStart = new google.maps.Marker({
-            position: e.latLng,
-            map,
-            label: "A",
-          });
-        } else if (!markerEnd) {
-          markerEnd = new google.maps.Marker({
-            position: e.latLng,
-            map,
-            label: "B",
-          });
+        // ✅ ЭТО ОБЯЗАТЕЛЬНО
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
 
-          // обе точки выбраны → отправляем в Telegram WebApp
-          sendRouteToBot();
-        }
-      });
+        map = new google.maps.Map(document.getElementById("map"), {
+            zoom: 12,
+            center: { lat: 15.3694, lng: 44.1910 },
+        });
 
-      // кнопка “Моё местоположение”
-      document.getElementById("locate-btn").addEventListener("click", () => {
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition((pos) => {
-            const userPos = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude
-            };
+        map.addListener("click", (e) => {
+            if (!startMarker) {
+                startMarker = new google.maps.Marker({
+                    position: e.latLng,
+                    map: map,
+                    label: "A"
+                });
+                startPos = e.latLng;
+                document.getElementById("start").innerText =
+                    "🚕 Точка A: " + e.latLng.lat().toFixed(5) + ", " + e.latLng.lng().toFixed(5);
+            } else if (!endMarker) {
+                endMarker = new google.maps.Marker({
+                    position: e.latLng,
+                    map: map,
+                    label: "B"
+                });
+                endPos = e.latLng;
+                document.getElementById("end").innerText =
+                    "📍 Точка B: " + e.latLng.lat().toFixed(5) + ", " + e.latLng.lng().toFixed(5);
 
-            map.setCenter(userPos);
-            map.setZoom(15);
-
-            if (!markerStart) {
-              markerStart = new google.maps.Marker({
-                position: userPos,
-                map,
-                label: "A",
-              });
-            } else {
-              markerStart.setPosition(userPos);
+                document.getElementById("send").disabled = false;
             }
+        });
 
-          }, () => {
-            alert("⚠️ Не удалось определить местоположение.");
-          });
-        } else {
-          alert("Браузер не поддерживает геолокацию.");
-        }
-      });
-    }
-
-    // отправляем точки в Telegram WebApp
-    function sendRouteToBot() {
-      if (markerStart && markerEnd && window.Telegram?.WebApp) {
-        const data = {
-          start: {
-            lat: markerStart.getPosition().lat(),
-            lng: markerStart.getPosition().lng(),
-          },
-          end: {
-            lat: markerEnd.getPosition().lat(),
-            lng: markerEnd.getPosition().lng(),
-          }
+        document.getElementById("send").onclick = () => {
+            const data = {
+                start: { lat: startPos.lat(), lng: startPos.lng() },
+                end: { lat: endPos.lat(), lng: endPos.lng() }
+            };
+console.log("sendData:", data);
+            Telegram.WebApp.sendData(JSON.stringify(data));
+            Telegram.WebApp.close();
         };
-        window.Telegram.WebApp.sendData(JSON.stringify(data));
-      }
     }
+</script>
 
-    window.onload = initMap;
-  </script>
+<script async
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBO5RQpbrvnBEfchhCGqKTpzvqOjJyf0RI&callback=initMap">
+</script>
+
 </body>
-</html>html>
-
+</html>
