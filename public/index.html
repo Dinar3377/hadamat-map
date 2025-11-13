@@ -56,7 +56,6 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
 
-    /* 🔹 Новая кнопка "X" для сброса точек */
     #clear-btn {
       position: absolute;
       top: 15px;
@@ -89,15 +88,13 @@
 
 <div id="map"></div>
 
-<!-- кнопка определения геопозиции -->
 <button id="locate-btn">📍 Моё местоположение</button>
-
-<!-- новая кнопка очистки -->
 <button id="clear-btn">✖</button>
 
 <div id="info">
   <div id="start">🚕 Точка A: Не выбрана</div>
   <div id="end">📍 Точка B: Не выбрана</div>
+  <div id="distance">📏 Расстояние: не рассчитано</div>
   <button id="send" disabled>Отправить 🚀</button>
 </div>
 
@@ -108,16 +105,25 @@
   let startPos = null;
   let endPos = null;
 
+  let directionsService;
+  let directionsRenderer;
+  let routeDistance = null; // метры
+
   function initMap() {
     Telegram.WebApp.ready();
     Telegram.WebApp.expand();
 
     map = new google.maps.Map(document.getElementById("map"), {
       zoom: 13,
-      center: { lat: 15.3694, lng: 44.1910 }, // Йемен
+      center: { lat: 15.3694, lng: 44.1910 },
     });
 
-    // выбор точек кликом
+    directionsService = new google.maps.DirectionsService();
+    directionsRenderer = new google.maps.DirectionsRenderer({
+      suppressMarkers: true
+    });
+    directionsRenderer.setMap(map);
+
     map.addListener("click", (e) => {
       if (!startMarker) {
         startMarker = new google.maps.Marker({
@@ -126,83 +132,99 @@
           label: "A"
         });
         startPos = e.latLng;
+
         document.getElementById("start").innerText =
-          "🚕 Точка A: " + e.latLng.lat().toFixed(5) + ", " + e.latLng.lng().toFixed(5);
-      } else if (!endMarker) {
+          `🚕 Точка A: ${startPos.lat().toFixed(5)}, ${startPos.lng().toFixed(5)}`;
+      }
+      else if (!endMarker) {
         endMarker = new google.maps.Marker({
           position: e.latLng,
           map: map,
           label: "B"
         });
         endPos = e.latLng;
+
         document.getElementById("end").innerText =
-          "📍 Точка B: " + e.latLng.lat().toFixed(5) + ", " + e.latLng.lng().toFixed(5);
-        document.getElementById("send").disabled = false;
+          `📍 Точка B: ${endPos.lat().toFixed(5)}, ${endPos.lng().toFixed(5)}`;
+
+        buildRoute();
       }
     });
 
-    // кнопка отправки
     document.getElementById("send").onclick = () => {
-      if (!startPos || !endPos) return;
+      if (!startPos || !endPos || !routeDistance) return;
+
       const data = {
         start: { lat: startPos.lat(), lng: startPos.lng() },
-        end: { lat: endPos.lat(), lng: endPos.lng() }
+        end: { lat: endPos.lat(), lng: endPos.lng() },
+        distance_km: (routeDistance / 1000).toFixed(3)
       };
-      console.log("sendData:", data);
+
       Telegram.WebApp.sendData(JSON.stringify(data));
       Telegram.WebApp.close();
     };
 
-    // кнопка очистки X (сбрасывает точки и маркеры)
-    document.getElementById("clear-btn").addEventListener("click", () => {
+    document.getElementById("clear-btn").onclick = () => {
       if (startMarker) startMarker.setMap(null);
       if (endMarker) endMarker.setMap(null);
+
       startMarker = null;
       endMarker = null;
       startPos = null;
       endPos = null;
+      routeDistance = null;
+
       document.getElementById("start").innerText = "🚕 Точка A: Не выбрана";
       document.getElementById("end").innerText = "📍 Точка B: Не выбрана";
+      document.getElementById("distance").innerText = "📏 Расстояние: не рассчитано";
+
+      directionsRenderer.set('directions', null);
       document.getElementById("send").disabled = true;
-    });
+    };
 
-    // кнопка "Моё местоположение" — только центрирует карту
-    document.getElementById("locate-btn").addEventListener("click", () => {
+    document.getElementById("locate-btn").onclick = () => {
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const userPos = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude
-            };
-            map.setCenter(userPos);
-            map.setZoom(15);
-
-            // временный синий кружок (исчезнет через 5 сек)
-            const marker = new google.maps.Marker({
-              position: userPos,
-              map: map,
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 8,
-                fillColor: "#2b8eff",
-                fillOpacity: 0.9,
-                strokeWeight: 2,
-                strokeColor: "white"
-              }
-            });
-            setTimeout(() => marker.setMap(null), 5000);
-          },
-          () => alert("⚠️ Не удалось определить местоположение.")
-        );
-      } else {
-        alert("❌ Ваш браузер не поддерживает геолокацию.");
+        navigator.geolocation.getCurrentPosition((pos) => {
+          const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          map.setCenter(p);
+          map.setZoom(15);
+        });
       }
+    };
+  }
+
+  function buildRoute() {
+    const request = {
+      origin: startPos,
+      destination: endPos,
+      travelMode: google.maps.TravelMode.DRIVING
+    };
+
+    directionsService.route(request, (result, status) => {
+      if (status !== "OK") {
+        alert("⚠ Ошибка маршрута");
+        return;
+      }
+
+      directionsRenderer.setDirections(result);
+
+      let meters = 0;
+      const legs = result.routes[0].legs;
+
+      legs.forEach(leg => {
+        meters += leg.distance.value;
+      });
+
+      routeDistance = meters;
+
+      document.getElementById("distance").innerText =
+        `📏 Расстояние: ${(meters / 1000).toFixed(2)} км`;
+
+      document.getElementById("send").disabled = false;
     });
   }
 </script>
 
-<!-- ✅ ВСТАВЬ СВОЙ РЕАЛЬНЫЙ API КЛЮЧ -->
 <script async
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBO5RQpbrvnBEfchhCGqKTpzvqOjJyf0RI&callback=initMap">
 </script>
