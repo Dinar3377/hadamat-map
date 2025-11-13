@@ -29,12 +29,12 @@
       box-shadow: 0 0 10px rgba(0,0,0,0.3);
     }
 
-    #reset-btn {
+    #send {
       width: 100%;
       padding: 12px;
       font-size: 18px;
       margin-top: 10px;
-      background: #ff4444;
+      background: #2b8eff;
       color: white;
       border: none;
       border-radius: 8px;
@@ -55,6 +55,32 @@
       cursor: pointer;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
+
+    /* 🔹 Новая кнопка "X" для сброса точек */
+    #clear-btn {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      z-index: 9999;
+      background-color: white;
+      border: 2px solid #ff4444;
+      color: #ff4444;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      font-size: 22px;
+      font-weight: bold;
+      line-height: 38px;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      transition: background 0.2s, color 0.2s;
+    }
+
+    #clear-btn:hover {
+      background-color: #ff4444;
+      color: white;
+    }
   </style>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -66,10 +92,13 @@
 <!-- кнопка определения геопозиции -->
 <button id="locate-btn">📍 Моё местоположение</button>
 
+<!-- новая кнопка очистки -->
+<button id="clear-btn">✖</button>
+
 <div id="info">
   <div id="start">🚕 Точка A: Не выбрана</div>
   <div id="end">📍 Точка B: Не выбрана</div>
-  <button id="reset-btn">❌ Отменить точки</button>
+  <button id="send" disabled>Отправить 🚀</button>
 </div>
 
 <script>
@@ -108,32 +137,33 @@
         endPos = e.latLng;
         document.getElementById("end").innerText =
           "📍 Точка B: " + e.latLng.lat().toFixed(5) + ", " + e.latLng.lng().toFixed(5);
-
-        // ✅ Когда обе точки выбраны — сразу отправляем данные
-        const data = {
-          start: { lat: startPos.lat(), lng: startPos.lng() },
-          end: { lat: endPos.lat(), lng: endPos.lng() }
-        };
-        console.log("sendData:", data);
-        Telegram.WebApp.sendData(JSON.stringify(data));
-        Telegram.WebApp.close();
+        document.getElementById("send").disabled = false;
       }
     });
 
-    // кнопка отмены точек
-    document.getElementById("reset-btn").addEventListener("click", () => {
-      if (startMarker) {
-        startMarker.setMap(null);
-        startMarker = null;
-      }
-      if (endMarker) {
-        endMarker.setMap(null);
-        endMarker = null;
-      }
+    // кнопка отправки
+    document.getElementById("send").onclick = () => {
+      if (!startPos || !endPos) return;
+      const data = {
+        start: { lat: startPos.lat(), lng: startPos.lng() },
+        end: { lat: endPos.lat(), lng: endPos.lng() }
+      };
+      console.log("sendData:", data);
+      Telegram.WebApp.sendData(JSON.stringify(data));
+      Telegram.WebApp.close();
+    };
+
+    // кнопка очистки X (сбрасывает точки и маркеры)
+    document.getElementById("clear-btn").addEventListener("click", () => {
+      if (startMarker) startMarker.setMap(null);
+      if (endMarker) endMarker.setMap(null);
+      startMarker = null;
+      endMarker = null;
       startPos = null;
       endPos = null;
       document.getElementById("start").innerText = "🚕 Точка A: Не выбрана";
       document.getElementById("end").innerText = "📍 Точка B: Не выбрана";
+      document.getElementById("send").disabled = true;
     });
 
     // кнопка "Моё местоположение" — только центрирует карту
@@ -148,7 +178,7 @@
             map.setCenter(userPos);
             map.setZoom(15);
 
-            // временный синий кружок
+            // временный синий кружок (исчезнет через 5 сек)
             const marker = new google.maps.Marker({
               position: userPos,
               map: map,
@@ -172,11 +202,10 @@
   }
 </script>
 
-<!-- ✅ Твой реальный API ключ -->
+<!-- ✅ ВСТАВЬ СВОЙ РЕАЛЬНЫЙ API КЛЮЧ -->
 <script async
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBO5RQpbrvnBEfchhCGqKTpzvqOjJyf0RI&callback=initMap">
 </script>
 
 </body>
 </html>
-
