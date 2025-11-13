@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <title>Hadamat Taxi</title>
+  <title>خدمة هدامات تاكسي</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <style>
@@ -10,6 +10,8 @@
       height: 100%;
       margin: 0;
       padding: 0;
+      direction: rtl;
+      font-family: sans-serif;
     }
 
     #map {
@@ -27,6 +29,8 @@
       border-radius: 8px;
       font-size: 16px;
       box-shadow: 0 0 10px rgba(0,0,0,0.3);
+      direction: rtl;
+      text-align: right;
     }
 
     #send {
@@ -88,14 +92,14 @@
 
 <div id="map"></div>
 
-<button id="locate-btn">📍 Моё местоположение</button>
+<button id="locate-btn">📍 موقعي الحالي</button>
 <button id="clear-btn">✖</button>
 
 <div id="info">
-  <div id="start">🚕 Точка A: Не выбрана</div>
-  <div id="end">📍 Точка B: Не выбрана</div>
-  <div id="distance">📏 Расстояние: не рассчитано</div>
-  <button id="send" disabled>Отправить 🚀</button>
+  <div id="start">🚕 النقطة A: غير محددة</div>
+  <div id="end">📍 النقطة B: غير محددة</div>
+  <div id="distance">📏 المسافة: غير محسوبة</div>
+  <button id="send" disabled>إرسال الطلب 🚀</button>
 </div>
 
 <script>
@@ -107,7 +111,7 @@
 
   let directionsService;
   let directionsRenderer;
-  let routeDistance = null; // метры
+  let routeDistance = null;
 
   function initMap() {
     Telegram.WebApp.ready();
@@ -134,7 +138,7 @@
         startPos = e.latLng;
 
         document.getElementById("start").innerText =
-          `🚕 Точка A: ${startPos.lat().toFixed(5)}, ${startPos.lng().toFixed(5)}`;
+          `🚕 النقطة A: ${startPos.lat().toFixed(5)}, ${startPos.lng().toFixed(5)}`;
       }
       else if (!endMarker) {
         endMarker = new google.maps.Marker({
@@ -145,7 +149,7 @@
         endPos = e.latLng;
 
         document.getElementById("end").innerText =
-          `📍 Точка B: ${endPos.lat().toFixed(5)}, ${endPos.lng().toFixed(5)}`;
+          `📍 النقطة B: ${endPos.lat().toFixed(5)}, ${endPos.lng().toFixed(5)}`;
 
         buildRoute();
       }
@@ -157,7 +161,7 @@
       const data = {
         start: { lat: startPos.lat(), lng: startPos.lng() },
         end: { lat: endPos.lat(), lng: endPos.lng() },
-        distance_km: (routeDistance / 1000).toFixed(3)
+        distance_km: (routeDistance / 1000).toFixed(2)
       };
 
       Telegram.WebApp.sendData(JSON.stringify(data));
@@ -174,9 +178,9 @@
       endPos = null;
       routeDistance = null;
 
-      document.getElementById("start").innerText = "🚕 Точка A: Не выбрана";
-      document.getElementById("end").innerText = "📍 Точка B: Не выбрана";
-      document.getElementById("distance").innerText = "📏 Расстояние: не рассчитано";
+      document.getElementById("start").innerText = "🚕 النقطة A: غير محددة";
+      document.getElementById("end").innerText = "📍 النقطة B: غير محددة";
+      document.getElementById("distance").innerText = "📏 المسافة: غير محسوبة";
 
       directionsRenderer.set('directions', null);
       document.getElementById("send").disabled = true;
@@ -202,7 +206,7 @@
 
     directionsService.route(request, (result, status) => {
       if (status !== "OK") {
-        alert("⚠ Ошибка маршрута");
+        alert("⚠ حدث خطأ في حساب المسار");
         return;
       }
 
@@ -218,7 +222,7 @@
       routeDistance = meters;
 
       document.getElementById("distance").innerText =
-        `📏 Расстояние: ${(meters / 1000).toFixed(2)} км`;
+        `📏 المسافة: ${(meters / 1000).toFixed(2)} كم`;
 
       document.getElementById("send").disabled = false;
     });
