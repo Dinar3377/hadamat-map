@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html>
 <head>
   <meta charset="utf-8">
-  <title>خدمة هدامات تاكسي</title>
+  <title>Hadamat Taxi Map</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <style>
@@ -10,7 +10,6 @@
       height: 100%;
       margin: 0;
       padding: 0;
-      direction: rtl;
       font-family: sans-serif;
     }
 
@@ -29,8 +28,6 @@
       border-radius: 8px;
       font-size: 16px;
       box-shadow: 0 0 10px rgba(0,0,0,0.3);
-      direction: rtl;
-      text-align: right;
     }
 
     #send {
@@ -45,39 +42,41 @@
       cursor: pointer;
     }
 
-    #locate-btn {
+    #send:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #locate-btn,
+    #clear-btn {
       position: absolute;
       top: 15px;
-      left: 15px;
       z-index: 9999;
       background-color: white;
-      border: 2px solid #2b8eff;
-      color: #2b8eff;
       border-radius: 8px;
       padding: 10px 15px;
       font-weight: bold;
       cursor: pointer;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      border: 2px solid #2b8eff;
+      color: #2b8eff;
+    }
+
+    #locate-btn {
+      left: 15px;
     }
 
     #clear-btn {
-      position: absolute;
-      top: 15px;
       right: 15px;
-      z-index: 9999;
-      background-color: white;
-      border: 2px solid #ff4444;
+      border-color: #ff4444;
       color: #ff4444;
       border-radius: 50%;
       width: 45px;
       height: 45px;
       font-size: 22px;
-      font-weight: bold;
-      line-height: 38px;
+      line-height: 22px;
       text-align: center;
-      cursor: pointer;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      transition: background 0.2s, color 0.2s;
+      padding: 10px 0;
     }
 
     #clear-btn:hover {
@@ -88,21 +87,117 @@
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
+
 <body>
 
 <div id="map"></div>
 
-<button id="locate-btn">📍 موقعي الحالي</button>
+<button id="locate-btn"></button>
 <button id="clear-btn">✖</button>
 
 <div id="info">
-  <div id="start">🚕 النقطة A: غير محددة</div>
-  <div id="end">📍 النقطة B: غير محددة</div>
-  <div id="distance">📏 المسافة: غير محسوبة</div>
-  <button id="send" disabled>إرسال الطلب 🚀</button>
+  <div id="start"></div>
+  <div id="end"></div>
+  <div id="distance"></div>
+  <button id="send" disabled></button>
 </div>
 
 <script>
+  // ============================================================
+  // 🌍 MULTILANGUAGE DICTIONARY (same languages as your bot)
+  // ============================================================
+  const TEXTS = {
+    ar: {
+      pointA_default: "🚕 النقطة A: غير محددة",
+      pointB_default: "📍 النقطة B: غير محددة",
+      distance_default: "📏 المسافة: غير محسوبة",
+
+      pointA_value: (lat, lng) => `🚕 النقطة A: ${lat}, ${lng}`,
+      pointB_value: (lat, lng) => `📍 النقطة B: ${lat}, ${lng}`,
+      distance_value: km => `📏 المسافة: ${km} كم`,
+
+      btn_locate: "📍 موقعي الحالي",
+      btn_send: "إرسال الطلب 🚀",
+
+      alert_route_error: "⚠ حدث خطأ في حساب المسار",
+      alert_geo_error: "⚠ لا يمكن الحصول على الموقع.",
+      alert_geo_not_supported: "⚠ جهازك لا يدعم تحديد الموقع.",
+    },
+
+    ru: {
+      pointA_default: "🚕 Точка A: не выбрана",
+      pointB_default: "📍 Точка B: не выбрана",
+      distance_default: "📏 Расстояние: не вычислено",
+
+      pointA_value: (lat, lng) => `🚕 Точка A: ${lat}, ${lng}`,
+      pointB_value: (lat, lng) => `📍 Точка B: ${lat}, ${lng}`,
+      distance_value: km => `📏 Расстояние: ${km} км`,
+
+      btn_locate: "📍 Мое местоположение",
+      btn_send: "Отправить заявку 🚀",
+
+      alert_route_error: "⚠ Ошибка при расчёте маршрута",
+      alert_geo_error: "⚠ Не удалось определить местоположение.",
+      alert_geo_not_supported: "⚠ Устройство не поддерживает геолокацию.",
+    },
+
+    en: {
+      pointA_default: "🚕 Point A: not set",
+      pointB_default: "📍 Point B: not set",
+      distance_default: "📏 Distance: not calculated",
+
+      pointA_value: (lat, lng) => `🚕 Point A: ${lat}, ${lng}`,
+      pointB_value: (lat, lng) => `📍 Point B: ${lat}, ${lng}`,
+      distance_value: km => `📏 Distance: ${km} km`,
+
+      btn_locate: "📍 My location",
+      btn_send: "Send request 🚀",
+
+      alert_route_error: "⚠ Error calculating route",
+      alert_geo_error: "⚠ Unable to get location.",
+      alert_geo_not_supported: "⚠ Your device does not support geolocation.",
+    }
+  };
+
+  // ============================================================
+  // 🔎 DETECT LANGUAGE FROM URL (?lang=ar)
+  // ============================================================
+  function getAppLang() {
+    const params = new URLSearchParams(window.location.search);
+    const lang = params.get("lang");
+    if (["ar", "ru", "en"].includes(lang)) return lang;
+    return "ar"; // default
+  }
+
+  let currentLang = getAppLang();
+
+  function t(key, ...args) {
+    const dict = TEXTS[currentLang];
+    const val = dict[key];
+
+    if (typeof val === "function") return val(...args);
+    return val ?? key;
+  }
+
+  // ============================================================
+  // 🔁 APPLY LANGUAGE (RTL / LTR + UI text)
+  // ============================================================
+  function applyLang() {
+    const rtl = currentLang === "ar";
+
+    document.documentElement.lang = currentLang;
+    document.documentElement.dir = rtl ? "rtl" : "ltr";
+
+    document.getElementById("locate-btn").innerText = t("btn_locate");
+    document.getElementById("start").innerText = t("pointA_default");
+    document.getElementById("end").innerText = t("pointB_default");
+    document.getElementById("distance").innerText = t("distance_default");
+    document.getElementById("send").innerText = t("btn_send");
+  }
+
+  // ============================================================
+  // 🗺 MAP LOGIC
+  // ============================================================
   let map;
   let startMarker = null;
   let endMarker = null;
@@ -117,9 +212,11 @@
     Telegram.WebApp.ready();
     Telegram.WebApp.expand();
 
+    applyLang();
+
     map = new google.maps.Map(document.getElementById("map"), {
       zoom: 13,
-      center: { lat: 15.3694, lng: 44.1910 },
+      center: { lat: 12.7794, lng: 45.0360 }, // Aden
     });
 
     directionsService = new google.maps.DirectionsService();
@@ -137,8 +234,11 @@
         });
         startPos = e.latLng;
 
-        document.getElementById("start").innerText =
-          `🚕 النقطة A: ${startPos.lat().toFixed(5)}, ${startPos.lng().toFixed(5)}`;
+        document.getElementById("start").innerText = t(
+          "pointA_value",
+          startPos.lat().toFixed(5),
+          startPos.lng().toFixed(5)
+        );
       }
       else if (!endMarker) {
         endMarker = new google.maps.Marker({
@@ -148,8 +248,11 @@
         });
         endPos = e.latLng;
 
-        document.getElementById("end").innerText =
-          `📍 النقطة B: ${endPos.lat().toFixed(5)}, ${endPos.lng().toFixed(5)}`;
+        document.getElementById("end").innerText = t(
+          "pointB_value",
+          endPos.lat().toFixed(5),
+          endPos.lng().toFixed(5)
+        );
 
         buildRoute();
       }
@@ -168,45 +271,55 @@
       Telegram.WebApp.close();
     };
 
-    document.getElementById("clear-btn").onclick = () => {
-      if (startMarker) startMarker.setMap(null);
-      if (endMarker) endMarker.setMap(null);
+    document.getElementById("clear-btn").onclick = clearRoute;
+    document.getElementById("locate-btn").onclick = locateUser;
+  }
 
-      startMarker = null;
-      endMarker = null;
-      startPos = null;
-      endPos = null;
-      routeDistance = null;
+  function clearRoute() {
+    if (startMarker) startMarker.setMap(null);
+    if (endMarker) endMarker.setMap(null);
 
-      document.getElementById("start").innerText = "🚕 النقطة A: غير محددة";
-      document.getElementById("end").innerText = "📍 النقطة B: غير محددة";
-      document.getElementById("distance").innerText = "📏 المسافة: غير محسوبة";
+    startMarker = null;
+    endMarker = null;
+    startPos = null;
+    endPos = null;
+    routeDistance = null;
 
-      directionsRenderer.set('directions', null);
-      document.getElementById("send").disabled = true;
-    };
+    document.getElementById("start").innerText = t("pointA_default");
+    document.getElementById("end").innerText = t("pointB_default");
+    document.getElementById("distance").innerText = t("distance_default");
 
-    document.getElementById("locate-btn").onclick = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos) => {
+    directionsRenderer.set("directions", null);
+    document.getElementById("send").disabled = true;
+  }
+
+  function locateUser() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
           const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
           map.setCenter(p);
           map.setZoom(15);
-        });
-      }
-    };
+        },
+        () => {
+          alert(t("alert_geo_error"));
+        }
+      );
+    } else {
+      alert(t("alert_geo_not_supported"));
+    }
   }
 
   function buildRoute() {
-    const request = {
+    const req = {
       origin: startPos,
       destination: endPos,
       travelMode: google.maps.TravelMode.DRIVING
     };
 
-    directionsService.route(request, (result, status) => {
+    directionsService.route(req, (result, status) => {
       if (status !== "OK") {
-        alert("⚠ حدث خطأ في حساب المسار");
+        alert(t("alert_route_error"));
         return;
       }
 
@@ -215,14 +328,11 @@
       let meters = 0;
       const legs = result.routes[0].legs;
 
-      legs.forEach(leg => {
-        meters += leg.distance.value;
-      });
-
+      legs.forEach(leg => meters += leg.distance.value);
       routeDistance = meters;
 
-      document.getElementById("distance").innerText =
-        `📏 المسافة: ${(meters / 1000).toFixed(2)} كم`;
+      const km = (meters / 1000).toFixed(2);
+      document.getElementById("distance").innerText = t("distance_value", km);
 
       document.getElementById("send").disabled = false;
     });
